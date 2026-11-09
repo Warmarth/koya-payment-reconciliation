@@ -8,13 +8,30 @@ import json
 
 total = 0.0
 count = 0
+transactions = {}
 
-with open("payments.jsonl") as f:
+with open("payments.jsonl", "r") as f:
     for line in f:
-        event = json.loads(line)
-        if event["status"] == "success":
-            total += float(event["amount"])
-            count += 1
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        if not isinstance(event, dict) or not event.get("txn_id"):
+            continue
+
+        txn_id = event["txn_id"]
+        previous = transactions.get(txn_id)
+        if previous is None or event["ts"] > previous["ts"]:
+            transactions[txn_id] = event
+
+for event in transactions.values():
+    if event["status"] == "success":
+        amount = event["amount"]
+        if isinstance(amount, str):
+            amount = amount.replace(",", "")
+        total += float(amount)
+        count += 1
 
 with open("expected.txt") as f:
     expected = int(f.read().strip())
